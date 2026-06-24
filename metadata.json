@@ -1,0 +1,6 @@
+{
+  "name": "ExpenseIQ",
+  "description": "Smart offline-first budgeting and expense tracker featuring automated SMS UPI receipt parsing, balance dashboards, and analytics charts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

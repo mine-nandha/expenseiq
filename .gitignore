@@ -1,0 +1,42 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Kotlin
+.kotlin/
+
+# Local SDK paths
+local.properties
+
+# IntelliJ / Android Studio / Zed
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# APKs and bundles
+*.apk
+*.aab
+
+# Native build outputs
+.externalNativeBuild/
+.cxx/
+
+# Captures
+captures/
+
+# Generated files
+app/release/
+app/debug/
+
+# Secrets and env files
+.env
+.env.*
+!.env.example
+release.keystore
