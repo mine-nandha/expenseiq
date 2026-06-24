@@ -88,7 +88,6 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
     // Dialog state controllers
     var showAddTxDialog by remember { mutableStateOf(false) }
     var activeEditTx by remember { mutableStateOf<ExpenseTransaction?>(null) }
-    var showAddCategoryDialog by remember { mutableStateOf(false) }
     var showAddBudgetDialog by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }

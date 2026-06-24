@@ -373,14 +373,15 @@ fun BudgetProgressCard(
     val categoryDetails = categories.firstOrNull { it.name == budget.categoryName }
     val themeColorHex = categoryDetails?.color ?: "#4F46E5"
     
-    val categoryIcon = when (budget.categoryName.lowercase().trim()) {
-        "food", "dining", "groceries", "restaurant" -> Icons.Default.Restaurant
-        "transport", "uber", "travel" -> Icons.Default.DirectionsCar
-        "shopping", "amazon" -> Icons.Default.ShoppingBag
-        "housing", "rent", "bills" -> Icons.Default.Home
-        "overall" -> Icons.Default.AccountBalanceWallet
-        else -> Icons.Default.Category
-    }
+    val categoryEmoji = categoryDetails?.iconName?.ifBlank { null }
+        ?: when (budget.categoryName.lowercase().trim()) {
+            "food", "dining", "groceries", "restaurant" -> "☕"
+            "transport", "uber", "travel" -> "🚕"
+            "shopping", "amazon" -> "🛍️"
+            "housing", "rent", "bills" -> "🏠"
+            "overall" -> "💰"
+            else -> "📁"
+        }
 
     Surface(
         modifier = Modifier
@@ -403,11 +404,9 @@ fun BudgetProgressCard(
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = categoryIcon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        text = categoryEmoji,
+                        fontSize = 20.sp
                     )
                 }
 

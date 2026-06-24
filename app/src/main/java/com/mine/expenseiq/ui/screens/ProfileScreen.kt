@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mine.expenseiq.data.model.Category
 import com.mine.expenseiq.viewmodel.ExpenseViewModel
 import com.mine.expenseiq.ui.theme.*
 
@@ -48,6 +49,10 @@ fun ProfileScreen(
     var showConfirmImportDialog by remember { mutableStateOf(false) }
     var importJsonText by remember { mutableStateOf("") }
     var exportedJsonText by remember { mutableStateOf("") }
+    
+    // Category management states
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var categoryToDelete by remember { mutableStateOf<Category?>(null) }
     
     // Toast controller helper
     var toastMessage by remember { mutableStateOf<String?>(null) }
@@ -242,7 +247,86 @@ fun ProfileScreen(
             }
         }
 
-        // 4. Data Backup & Rebuild Engine Controller
+        // 4. Category Management
+        item {
+            Text(
+                text = "CATEGORY MANAGEMENT",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+        }
+
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("category_management_card"),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Button(
+                        onClick = { showAddCategoryDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("add_category_button"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Add Custom Category", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        "EXPENSE CATEGORIES",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    categories.filter { it.type == "EXPENSE" }.forEach { cat ->
+                        CategoryRow(
+                            category = cat,
+                            onDelete = { categoryToDelete = cat }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        "INCOME CATEGORIES",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    categories.filter { it.type == "INCOME" }.forEach { cat ->
+                        CategoryRow(
+                            category = cat,
+                            onDelete = { categoryToDelete = cat }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 5. Data Backup & Rebuild Engine Controller
         item {
             Text(
                 text = "DATA BACKUP & RESTORE CONSOLE",
@@ -514,7 +598,90 @@ fun ProfileScreen(
         )
     }
 
-    // 2. IMPORT OVERWRITE CONFIRMATION WARNING DIALOG
+    // 3. DELETE CATEGORY CONFIRMATION DIALOG
+    categoryToDelete?.let { cat ->
+        val txCount = transactions.count { it.category == cat.name }
+        val budgetCount = budgets.count { it.categoryName == cat.name }
+        AlertDialog(
+            onDismissRequest = { categoryToDelete = null },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Text("Delete Category?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Are you sure you want to delete \"${cat.name}\"?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (txCount > 0 || budgetCount > 0) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                if (txCount > 0) {
+                                    Text(
+                                        "$txCount transaction(s) use this category.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                if (budgetCount > 0) {
+                                    Text(
+                                        "$budgetCount budget(s) reference this category.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                Text(
+                                    "Deleting will leave those entries without a valid category reference.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCategory(cat)
+                        categoryToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToDelete = null }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
+    // 4. ADD CATEGORY DIALOG
+    if (showAddCategoryDialog) {
+        AddCategoryDialog(
+            onDismiss = { showAddCategoryDialog = false },
+            onSave = { name, color, iconName, type ->
+                viewModel.addCategory(name, color, iconName, type)
+                showAddCategoryDialog = false
+            }
+        )
+    }
+
+    // 5. IMPORT OVERWRITE CONFIRMATION WARNING DIALOG
     if (showConfirmImportDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmImportDialog = false },
@@ -564,6 +731,50 @@ fun ProfileScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun CategoryRow(
+    category: Category,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(
+                        Color(android.graphics.Color.parseColor(category.color)),
+                        CircleShape
+                    )
+            )
+            Text(
+                text = category.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Delete ${category.name}",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 

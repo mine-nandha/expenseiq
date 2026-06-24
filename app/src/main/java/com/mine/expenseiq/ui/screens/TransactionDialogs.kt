@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.mine.expenseiq.data.model.*
@@ -828,14 +829,30 @@ fun AddCategoryDialog(
         "#009688", "#E65100", "#1B5E20", "#311B92"
     )
 
+    var selectedIconName by remember { mutableStateOf("📁") }
+
+    val emojiGroups = listOf(
+        "Food & Drink" to listOf("☕", "🍕", "🍔", "🍟", "🌮", "🍜", "🍣", "🍩", "🍪", "🍺", "🍷", "🍰", "🥗", "🍳", "🥤", "🍱", "🍝", "🥩", "🍦", "🍿"),
+        "Transport" to listOf("🚗", "🚕", "🚌", "🚲", "✈️", "🚢", "🚂", "🛵", "🚁", "🚀", "🚇", "🚊", "🛴", "🏎️"),
+        "Shopping" to listOf("🛍️", "👗", "👟", "👠", "🎁", "🛒", "👕", "👖", "👔", "👛", "💄"),
+        "Home & Bills" to listOf("🏠", "🏢", "🏡", "🏦", "🏪", "💒", "🏬", "🏨", "🏧"),
+        "Health" to listOf("💊", "💉", "💪", "🧘", "🧠", "🦷", "🫀", "🏥", "🩺", "❤️"),
+        "Entertainment" to listOf("🎬", "🎮", "🎵", "🎧", "⚽", "🎯", "🎪", "🎭", "🎶", "🎸", "🎨", "🎲", "🏀", "🎉"),
+        "Finance" to listOf("💰", "💳", "💵", "💷", "💶", "💎", "📊", "📈", "📉", "🧾"),
+        "Nature" to listOf("🌿", "🌻", "🌊", "🌈", "🌸", "🌺", "🌳", "🌞", "🌙", "⭐", "🔥", "🌴", "🍃"),
+        "Travel" to listOf("🗺️", "🧳", "🌍", "🏖️", "🏔️", "🏝️", "🌋", "🏕️", "🗽"),
+        "Tech & Work" to listOf("💻", "📱", "🖥️", "💼", "🔧", "💡", "🔌", "⚙️", "🖨️", "⌨️", "📷", "👑"),
+        "Misc" to listOf("🔑", "🎓", "📚", "✉️", "📝", "🏆", "💎", "🎯", "💌", "🔔", "🎀", "🧸")
+    )
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth().wrapContentHeight()
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
                 Text(
                     text = "Add Custom Category",
                     style = MaterialTheme.typography.titleLarge,
@@ -921,6 +938,69 @@ fun AddCategoryDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Pick an Emoji:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = selectedIconName,
+                        fontSize = 32.sp
+                    )
+                    OutlinedTextField(
+                        value = selectedIconName,
+                        onValueChange = { selectedIconName = if (it.isEmpty()) "\uD83D\uDCC1" else it },
+                        label = { Text("Type or paste any emoji") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("Pick a common one:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                emojiGroups.forEach { (groupName, emojis) ->
+                    Text(
+                        text = groupName,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    emojis.chunked(7).forEach { rowEmojis ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            rowEmojis.forEach { emoji ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            if (selectedIconName == emoji) Color(android.graphics.Color.parseColor(selectedColor)).copy(alpha = 0.15f)
+                                            else MaterialTheme.colorScheme.surfaceVariant,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { selectedIconName = emoji },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = emoji, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Row(
@@ -932,7 +1012,7 @@ fun AddCategoryDialog(
                     Button(
                         onClick = {
                             if (name.trim().isNotEmpty()) {
-                                onSave(name.trim(), selectedColor, "Category", type)
+                                onSave(name.trim(), selectedColor, selectedIconName, type)
                             }
                         },
                         modifier = Modifier.testTag("submit_button")

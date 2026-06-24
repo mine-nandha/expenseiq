@@ -728,15 +728,16 @@ fun TransactionListItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // EMOJI / CATEGORY ICON
-        val emoji = when (transaction.category.lowercase().trim()) {
-            "food", "food & dining", "dining", "cafe", "restaurant", "starcafe" -> "☕"
-            "transport", "uber", "taxi", "travel" -> "🚕"
-            "shopping", "amazon", "groceries" -> "🛍️"
-            "salary", "income" -> "💰"
-            "savings", "investment" -> "📈"
-            "housing", "rent", "bills" -> "🏠"
-            else -> "💸"
-        }
+        val emoji = categoryDetails?.iconName?.ifBlank { null }
+            ?: when (transaction.category.lowercase().trim()) {
+                "food", "food & dining", "dining", "cafe", "restaurant", "starcafe" -> "☕"
+                "transport", "uber", "taxi", "travel" -> "🚕"
+                "shopping", "amazon", "groceries" -> "🛍️"
+                "salary", "income" -> "💰"
+                "savings", "investment" -> "📈"
+                "housing", "rent", "bills" -> "🏠"
+                else -> "💸"
+            }
 
         Box(
             modifier = Modifier
