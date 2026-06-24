@@ -22,11 +22,9 @@ android {
 
   signingConfigs {
       create("release") {
-          val keystorePath =
-              System.getenv("KEYSTORE_PATH")
-                  ?: "${rootDir}/release.keystore"
-
-          storeFile = file(keystorePath)
+          storeFile = rootProject.file(
+              System.getenv("KEYSTORE_PATH") ?: "release.keystore"
+          )
           storePassword = System.getenv("STORE_PASSWORD")
           keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
           keyPassword =
