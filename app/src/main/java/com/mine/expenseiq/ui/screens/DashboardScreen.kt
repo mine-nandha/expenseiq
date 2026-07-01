@@ -34,12 +34,14 @@ import java.util.*
 fun DashboardScreen(
     viewModel: ExpenseViewModel,
     onNavigateToTab: (Int) -> Unit,
-    onEditTransaction: (ExpenseTransaction) -> Unit
+    onEditTransaction: (ExpenseTransaction) -> Unit,
+    onQuickLog: (QuickLogSuggestion) -> Unit
 ) {
     val accounts by viewModel.accounts.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val budgets by viewModel.budgets.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val quickLogSuggestions by viewModel.quickLogSuggestions.collectAsState()
 
     // Aggregate summary statistics
     val netWorth = accounts.sumOf { it.balance }
@@ -551,35 +553,40 @@ fun DashboardScreen(
 
 
 
-        // 6. Navigation Quick Shortcut Grid
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ShortcutCard(
-                    title = "Budgets", 
-                    icon = Icons.Default.Timer, 
-                    color = BentoAccentOrange, 
-                    modifier = Modifier.weight(1f)
+        // 6. QuickLog Suggestions (replaces static shortcuts)
+        if (quickLogSuggestions.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    onNavigateToTab(2)
+                    Text(
+                        text = "Quick Log",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Tap to auto-fill",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-                ShortcutCard(
-                    title = "Accounts", 
-                    icon = Icons.Default.CreditCard, 
-                    color = BentoAccentBlue, 
-                    modifier = Modifier.weight(1f)
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    onNavigateToTab(3)
-                }
-                ShortcutCard(
-                    title = "Report", 
-                    icon = Icons.Default.PieChart, 
-                    color = BentoAccentGreen, 
-                    modifier = Modifier.weight(1f)
-                ) {
-                    onNavigateToTab(4)
+                    quickLogSuggestions.take(3).forEach { suggestion ->
+                        QuickLogCard(
+                            suggestion = suggestion,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onQuickLog(suggestion) }
+                        )
+                    }
                 }
             }
         }
@@ -700,6 +707,87 @@ fun ShortcutCard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+@Composable
+fun QuickLogCard(
+    suggestion: QuickLogSuggestion,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val isExpense = suggestion.type == "EXPENSE"
+    val amountColor = if (isExpense) MaterialTheme.colorScheme.onSurface else BentoAccentGreen
+    val prefix = if (isExpense) "-" else "+"
+
+    Card(
+        modifier = modifier
+            .height(110.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(BentoAccentOrange.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "⚡ QUICK",
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BentoAccentOrange
+                        )
+                    }
+                    Text(
+                        text = "${suggestion.frequency}x",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = suggestion.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "$prefix₹${String.format(Locale.getDefault(), "%,.0f", suggestion.amount)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Black,
+                    color = amountColor
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = suggestion.category,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }

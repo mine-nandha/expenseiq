@@ -92,6 +92,7 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var activeEditAccount by remember { mutableStateOf<Account?>(null) }
     var showTransferDialog by remember { mutableStateOf(false) }
+    var quickLogPrefill by remember { mutableStateOf<QuickLogSuggestion?>(null) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -169,7 +170,11 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
                 0 -> DashboardScreen(
                     viewModel = viewModel,
                     onNavigateToTab = { currentTab = it },
-                    onEditTransaction = { activeEditTx = it }
+                    onEditTransaction = { activeEditTx = it },
+                    onQuickLog = { suggestion ->
+                        quickLogPrefill = suggestion
+                        showAddTxDialog = true
+                    }
                 )
                 1 -> TransactionsScreen(
                     viewModel = viewModel,
@@ -224,7 +229,11 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
             AddTransactionDialog(
                 categories = categories,
                 accounts = accounts,
-                onDismiss = { showAddTxDialog = false },
+                prefill = quickLogPrefill,
+                onDismiss = {
+                    showAddTxDialog = false
+                    quickLogPrefill = null
+                },
                 onSave = { amt, type, cat, dt, nt, mode, accId, photo, recur, period, tags ->
                     viewModel.addTransaction(
                         amount = amt,
@@ -240,6 +249,7 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
                         tags = tags
                     )
                     showAddTxDialog = false
+                    quickLogPrefill = null
                 }
             )
         }

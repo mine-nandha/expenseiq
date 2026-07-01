@@ -31,6 +31,7 @@ import java.util.*
 fun AddTransactionDialog(
     categories: List<Category>,
     accounts: List<Account>,
+    prefill: QuickLogSuggestion? = null,
     onDismiss: () -> Unit,
     onSave: (
         amount: Double,
@@ -46,15 +47,15 @@ fun AddTransactionDialog(
         tags: String
     ) -> Unit
 ) {
-    var amountStr by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("EXPENSE") }
-    var selectedCategory by remember { mutableStateOf(categories.firstOrNull { it.type == "EXPENSE" }?.name ?: "Food") }
+    var amountStr by remember { mutableStateOf(prefill?.amount?.toString() ?: "") }
+    var type by remember { mutableStateOf(prefill?.type ?: "EXPENSE") }
+    var selectedCategory by remember { mutableStateOf(prefill?.category ?: (categories.firstOrNull { it.type == "EXPENSE" }?.name ?: "Food")) }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
-    var note by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf(prefill?.note ?: "") }
     
-    val defaultAccount = accounts.firstOrNull()
-    var selectedAccountId by remember { mutableStateOf(defaultAccount?.id ?: 1L) }
-    var selectedAccountName by remember { mutableStateOf(defaultAccount?.name ?: "Cash") }
+    val defaultAccount = accounts.firstOrNull { it.id == (prefill?.accountId ?: 0L) } ?: accounts.firstOrNull()
+    var selectedAccountId by remember { mutableStateOf(prefill?.accountId ?: defaultAccount?.id ?: 1L) }
+    var selectedAccountName by remember { mutableStateOf(prefill?.accountName ?: defaultAccount?.name ?: "Cash") }
 
     var isRecurring by remember { mutableStateOf(false) }
     var recurrencePeriod by remember { mutableStateOf("MONTHLY") }

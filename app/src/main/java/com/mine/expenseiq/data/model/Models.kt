@@ -45,3 +45,13 @@ data class ExpenseTransaction(
     val recurrencePeriod: String? = null, // DAILY, WEEKLY, MONTHLY
     val tags: String = "" // Comma-separated list of tags
 ) : Serializable
+
+data class QuickLogSuggestion(
+    val amount: Double,
+    val type: String,
+    val category: String,
+    val note: String,
+    val accountId: Long,
+    val accountName: String,
+    val frequency: Int
+)

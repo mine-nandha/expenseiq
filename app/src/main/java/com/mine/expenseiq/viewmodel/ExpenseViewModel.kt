@@ -31,6 +31,9 @@ class ExpenseViewModel(
     val transactions: StateFlow<List<ExpenseTransaction>> = repository.allTransactions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _quickLogSuggestions = MutableStateFlow<List<QuickLogSuggestion>>(emptyList())
+    val quickLogSuggestions: StateFlow<List<QuickLogSuggestion>> = _quickLogSuggestions.asStateFlow()
+
     // --- SMS REALTIME FLOWS ---
     private val _pendingSms = MutableStateFlow<ParsedSms?>(null)
     val pendingSms: StateFlow<ParsedSms?> = _pendingSms.asStateFlow()
@@ -43,6 +46,12 @@ class ExpenseViewModel(
         viewModelScope.launch {
             SmsTrigger.smsFlow.collect { parsedSms ->
                 _pendingSms.value = parsedSms
+            }
+        }
+        // Recompute quick-log suggestions whenever transactions change
+        viewModelScope.launch {
+            repository.allTransactions.collect {
+                computeQuickLogSuggestions()
             }
         }
     }
@@ -201,6 +210,28 @@ class ExpenseViewModel(
 
     fun clearScannedSmsList() {
         _scannedSmsList.value = emptyList()
+    }
+
+    fun computeQuickLogSuggestions() {
+        val txs = transactions.value
+        val groups = txs.filter { it.note !in listOf("Transaction", "SMS Sync") }
+            .groupBy { it.note }
+            .mapValues { (_, txs) -> txs.sortedByDescending { it.date } }
+            .entries
+            .sortedByDescending { it.value.size }
+            .take(4)
+        _quickLogSuggestions.value = groups.map { (note, txs) ->
+            val latest = txs.first()
+            QuickLogSuggestion(
+                amount = latest.amount,
+                type = latest.type,
+                category = latest.category,
+                note = note,
+                accountId = latest.accountId,
+                accountName = latest.paymentMode,
+                frequency = txs.size
+            )
+        }
     }
 
     // --- TRANSACTION ACTIONS ---
