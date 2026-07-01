@@ -1296,6 +1296,140 @@ fun AddAccountDialog(
 }
 
 @Composable
+fun EditAccountDialog(
+    account: Account,
+    onDismiss: () -> Unit,
+    onSave: (Account) -> Unit
+) {
+    var name by remember { mutableStateOf(account.name) }
+    var balanceStr by remember { mutableStateOf(account.balance.toBigDecimal().stripTrailingZeros().toPlainString()) }
+    var type by remember { mutableStateOf(account.type) }
+    var selectedColor by remember { mutableStateOf(account.color) }
+
+    val accountTypes = listOf("CASH", "BANK", "CREDIT_CARD", "WALLET")
+    val colors = listOf("#4CAF50", "#2196F3", "#F44336", "#00BCD4", "#9C27B0", "#E91E63", "#795548")
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth().wrapContentHeight()
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Edit Account / Card",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Account / Card Name (e.g. Axis Bank)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("edit_account_name_input"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = balanceStr,
+                    onValueChange = { balanceStr = it },
+                    label = { Text("Balance (INR)") },
+                    leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("edit_account_balance_input"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                var typeExpanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = type,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Account Type") },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { typeExpanded = true },
+                        enabled = false,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    DropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
+                        accountTypes.forEach { accType ->
+                            DropdownMenuItem(
+                                text = { Text(accType) },
+                                onClick = {
+                                    type = accType
+                                    typeExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Pick Card Theme Color:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    colors.forEach { hex ->
+                        val col = Color(android.graphics.Color.parseColor(hex))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(col, RoundedCornerShape(18.dp))
+                                .clickable { selectedColor = hex }
+                                .padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (selectedColor == hex) {
+                                Icon(Icons.Default.Check, "Selected", modifier = Modifier.size(20.dp), tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val bal = balanceStr.toDoubleOrNull() ?: account.balance
+                            if (name.trim().isNotEmpty()) {
+                                onSave(account.copy(name = name.trim(), type = type, balance = bal, color = selectedColor))
+                            }
+                        },
+                        modifier = Modifier.testTag("submit_button")
+                    ) { Text("Update Account") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun TransferFundsDialog(
     accounts: List<Account>,
     onDismiss: () -> Unit,

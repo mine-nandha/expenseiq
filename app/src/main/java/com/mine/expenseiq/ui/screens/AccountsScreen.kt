@@ -44,7 +44,8 @@ fun AccountsScreen(
     viewModel: ExpenseViewModel,
     onAddAccountClick: () -> Unit,
     onTransferClick: () -> Unit,
-    onEditTransaction: (ExpenseTransaction) -> Unit
+    onEditTransaction: (ExpenseTransaction) -> Unit,
+    onEditAccount: (Account) -> Unit
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -524,28 +525,48 @@ fun AccountsScreen(
                                 )
                             }
 
-                            // Danger zone: Delete selected account
-                            IconButton(
-                                onClick = {
-                                    if (accounts.size > 1) {
-                                        viewModel.deleteAccount(selectedAccount)
-                                        // Pick another account as active default
-                                        selectedAccountId = accounts.firstOrNull { it.id != selectedAccount.id }?.id
-                                        Toast.makeText(context, "${selectedAccount.name} closed safely.", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "At least one digital wallet is required.", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), CircleShape)
-                                    .size(36.dp)
+                            // Edit and Delete account actions
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteForever,
-                                    contentDescription = "Delete Account",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                // Edit selected account
+                                IconButton(
+                                    onClick = { onEditAccount(selectedAccount) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Account",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                // Delete selected account
+                                IconButton(
+                                    onClick = {
+                                        if (accounts.size > 1) {
+                                            viewModel.deleteAccount(selectedAccount)
+                                            selectedAccountId = accounts.firstOrNull { it.id != selectedAccount.id }?.id
+                                            Toast.makeText(context, "${selectedAccount.name} closed safely.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "At least one digital wallet is required.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteForever,
+                                        contentDescription = "Delete Account",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
 

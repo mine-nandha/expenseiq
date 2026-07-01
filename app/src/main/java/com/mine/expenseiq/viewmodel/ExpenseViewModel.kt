@@ -260,6 +260,12 @@ class ExpenseViewModel(
         }
     }
 
+    fun updateAccount(account: Account) {
+        viewModelScope.launch {
+            repository.updateAccount(account)
+        }
+    }
+
     // --- TRANSFER BETWEEN ACCOUNTS ---
     fun executeTransfer(fromAccountId: Long, toAccountId: Long, amount: Double) {
         viewModelScope.launch {

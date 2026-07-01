@@ -90,6 +90,7 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
     var activeEditTx by remember { mutableStateOf<ExpenseTransaction?>(null) }
     var showAddBudgetDialog by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
+    var activeEditAccount by remember { mutableStateOf<Account?>(null) }
     var showTransferDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -183,7 +184,8 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
                     viewModel = viewModel,
                     onAddAccountClick = { showAddAccountDialog = true },
                     onTransferClick = { showTransferDialog = true },
-                    onEditTransaction = { activeEditTx = it }
+                    onEditTransaction = { activeEditTx = it },
+                    onEditAccount = { activeEditAccount = it }
                 )
                 4 -> ReportsScreen(viewModel = viewModel)
                 5 -> ProfileScreen(
@@ -289,7 +291,19 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
             )
         }
 
-        // 6. TRANSFER FUNDS OVERLAY
+        // 6. EDIT ACCOUNT OVERLAY
+        activeEditAccount?.let { account ->
+            EditAccountDialog(
+                account = account,
+                onDismiss = { activeEditAccount = null },
+                onSave = { updated ->
+                    viewModel.updateAccount(updated)
+                    activeEditAccount = null
+                }
+            )
+        }
+
+        // 7. TRANSFER FUNDS OVERLAY
         if (showTransferDialog) {
             TransferFundsDialog(
                 accounts = accounts,
