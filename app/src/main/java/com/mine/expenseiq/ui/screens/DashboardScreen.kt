@@ -53,7 +53,7 @@ fun DashboardScreen(
     // Helper functions to check monthly numbers
     val monthlyTransactions = transactions.filter { tx ->
         val cal = Calendar.getInstance().apply { timeInMillis = tx.date }
-        cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
+        cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear && tx.tags != "Transfer"
     }
     
     val monthlyIncome = monthlyTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
@@ -815,8 +815,11 @@ fun TransactionListItem(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val isTransfer = transaction.tags == "Transfer"
+
         // EMOJI / CATEGORY ICON
-        val emoji = categoryDetails?.iconName?.ifBlank { null }
+        val emoji = if (isTransfer) "🔄"
+            else categoryDetails?.iconName?.ifBlank { null }
             ?: when (transaction.category.lowercase().trim()) {
                 "food", "food & dining", "dining", "cafe", "restaurant", "starcafe" -> "☕"
                 "transport", "uber", "taxi", "travel" -> "🚕"
@@ -830,7 +833,11 @@ fun TransactionListItem(
         Box(
             modifier = Modifier
                 .size(42.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp)),
+                .background(
+                    if (isTransfer) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(14.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -851,12 +858,27 @@ fun TransactionListItem(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = transaction.category,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
-                )
+                if (isTransfer) {
+                    Box(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "Transfer",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                } else {
+                    Text(
+                        text = transaction.category,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("·", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.width(4.dp))
@@ -880,11 +902,16 @@ fun TransactionListItem(
 
         Column(horizontalAlignment = Alignment.End) {
             val isExpenses = transaction.type == "EXPENSE"
+            val amountColor = if (isTransfer) MaterialTheme.colorScheme.onSurfaceVariant
+                else if (isExpenses) MaterialTheme.colorScheme.onSurface
+                else BentoAccentGreen
             Text(
-                text = if (isExpenses) "-₹${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}" else "+₹${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}",
+                text = if (isTransfer) "₹${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}"
+                    else if (isExpenses) "-₹${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}"
+                    else "+₹${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Black,
-                color = if (isExpenses) MaterialTheme.colorScheme.onSurface else BentoAccentGreen
+                color = amountColor
             )
         }
 

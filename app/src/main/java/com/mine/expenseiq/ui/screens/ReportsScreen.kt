@@ -55,11 +55,11 @@ fun ReportsScreen(viewModel: ExpenseViewModel) {
         "July", "August", "September", "October", "November", "December"
     )
 
-    // Filter transactions for chosen month + year
+    // Filter transactions for chosen month + year (exclude transfers)
     val filteredHistory = remember(transactions, selectedMonth, selectedYear) {
         transactions.filter { tx ->
             val cal = Calendar.getInstance().apply { timeInMillis = tx.date }
-            cal.get(Calendar.MONTH) == selectedMonth && cal.get(Calendar.YEAR) == selectedYear
+            cal.get(Calendar.MONTH) == selectedMonth && cal.get(Calendar.YEAR) == selectedYear && tx.tags != "Transfer"
         }
     }
 

@@ -214,7 +214,7 @@ class ExpenseViewModel(
 
     fun computeQuickLogSuggestions() {
         val txs = transactions.value
-        val groups = txs.filter { it.note !in listOf("Transaction", "SMS Sync") }
+        val groups = txs.filter { it.note !in listOf("Transaction", "SMS Sync") && it.tags != "Transfer" }
             .groupBy { it.note }
             .mapValues { (_, txs) -> txs.sortedByDescending { it.date } }
             .entries
@@ -308,18 +308,20 @@ class ExpenseViewModel(
                 type = "EXPENSE",
                 category = "Savings",
                 date = System.currentTimeMillis(),
-                note = "Transfer -> ${toAcc.name}",
+                note = "Transfer: ${fromAcc.name} → ${toAcc.name}",
                 paymentMode = fromAcc.name,
-                accountId = fromAccountId
+                accountId = fromAccountId,
+                tags = "Transfer"
             )
             val toTx = ExpenseTransaction(
                 amount = amount,
                 type = "INCOME",
                 category = "Savings",
                 date = System.currentTimeMillis(),
-                note = "Transfer <- ${fromAcc.name}",
+                note = "Transfer: ${fromAcc.name} → ${toAcc.name}",
                 paymentMode = toAcc.name,
-                accountId = toAccountId
+                accountId = toAccountId,
+                tags = "Transfer"
             )
             repository.addTransaction(fromTx)
             repository.addTransaction(toTx)

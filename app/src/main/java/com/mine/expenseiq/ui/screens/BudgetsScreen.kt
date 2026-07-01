@@ -50,7 +50,7 @@ fun BudgetsScreen(
     calendar.set(Calendar.MILLISECOND, 0)
     val firstDayOfMonthMs = calendar.timeInMillis
 
-    val monthlyTransactions = transactions.filter { it.date >= firstDayOfMonthMs }
+    val monthlyTransactions = transactions.filter { it.date >= firstDayOfMonthMs && it.tags != "Transfer" }
     val totalSpendThisMonth = monthlyTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
 
     // Group transaction expenses by primary category names
