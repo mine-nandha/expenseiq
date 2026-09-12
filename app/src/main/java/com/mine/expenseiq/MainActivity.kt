@@ -81,7 +81,23 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
     // Collect Flow States
     val accounts by viewModel.accounts.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val transactions by viewModel.transactions.collectAsState()
     val pendingSms by viewModel.pendingSms.collectAsState()
+
+    // Most-used ranking (quickfill-style) derived from the last 100 past transactions
+    val recentTransactions by remember(transactions) {
+        mutableStateOf(
+            transactions.sortedWith(compareByDescending<ExpenseTransaction> { it.date }.thenByDescending { it.id }).take(100)
+        )
+    }
+    val accountUsage by remember(recentTransactions) {
+        mutableStateOf(recentTransactions.groupingBy { it.accountId }.eachCount())
+    }
+    val categoryUsage by remember(recentTransactions) {
+        mutableStateOf(recentTransactions.groupBy { it.type }.mapValues { (_, txs) ->
+            txs.groupingBy { it.category }.eachCount()
+        })
+    }
 
     var currentTab by remember { mutableStateOf(0) }
 
@@ -229,6 +245,8 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
             AddTransactionDialog(
                 categories = categories,
                 accounts = accounts,
+                accountUsage = accountUsage,
+                categoryUsage = categoryUsage,
                 prefill = quickLogPrefill,
                 onDismiss = {
                     showAddTxDialog = false
@@ -250,6 +268,21 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
                     )
                     showAddTxDialog = false
                     quickLogPrefill = null
+                },
+                onSaveAndAddAnother = { amt, type, cat, dt, nt, mode, accId, photo, recur, period, tags ->
+                    viewModel.addTransaction(
+                        amount = amt,
+                        type = type,
+                        category = cat,
+                        date = dt,
+                        note = nt,
+                        paymentMode = mode,
+                        accountId = accId,
+                        photoUri = photo,
+                        isRecurring = recur,
+                        recurrencePeriod = period,
+                        tags = tags
+                    )
                 }
             )
         }

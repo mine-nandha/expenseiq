@@ -290,291 +290,31 @@ fun DashboardScreen(
             }
         }
 
-        // 4. Bento Side-by-Side Cells: Budget Progress & Accounts Card
+
+
+
+        // 4. QuickLog Suggestions (replaces static shortcuts)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left Bento Card: Unified Budget Health Tracking
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(180.dp)
-                        .clickable { onNavigateToTab(2) },
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "BUDGET HEALTH",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "${budgets.size} CAPS",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            if (budgets.isEmpty()) {
-                                Text(
-                                    text = "Unrestricted",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Configuring target boundaries will help prevent overspending leakages.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 14.sp
-                                )
-                            } else {
-                                val totalBudgetLimitsCombined = budgets.sumOf { it.limitAmount }
-                                val totalBudgetSpentCombined = budgets.sumOf { b ->
-                                    if (b.categoryName == "Overall") {
-                                        monthlyExpense
-                                    } else {
-                                        categorySpendMap[b.categoryName] ?: 0.0
-                                    }
-                                }
-                                val overspentCount = budgets.count { b ->
-                                    val spent = if (b.categoryName == "Overall") monthlyExpense else (categorySpendMap[b.categoryName] ?: 0.0)
-                                    spent >= b.limitAmount
-                                }
-                                
-                                val fractionCombined = if (totalBudgetLimitsCombined > 0) (totalBudgetSpentCombined / totalBudgetLimitsCombined).coerceIn(0.0, 1.0) else 0.0
-                                val percentCombined = (fractionCombined * 100).toInt()
-                                
-                                Text(
-                                    text = "₹${String.format(Locale.getDefault(), "%,.0f", totalBudgetSpentCombined)} Spent",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "of ₹${String.format(Locale.getDefault(), "%,.0f", totalBudgetLimitsCombined)} limit",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                
-                                Spacer(modifier = Modifier.height(10.dp))
-                                
-                                val indicatorColor = when {
-                                    percentCombined >= 100 -> Color(0xFFEF4444)
-                                    percentCombined >= 80 -> Color(0xFFF59E0B)
-                                    else -> MaterialTheme.colorScheme.primary
-                                }
-                                
-                                LinearProgressIndicator(
-                                    progress = { fractionCombined.toFloat() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(CircleShape),
-                                    color = indicatorColor,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    strokeCap = StrokeCap.Round
-                                )
-                                
-                                Spacer(modifier = Modifier.height(10.dp))
-                                
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    val isBreached = overspentCount > 0
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .background(if (isBreached) Color(0xFFEF4444) else BentoAccentGreen, CircleShape)
-                                    )
-                                    Text(
-                                        text = if (isBreached) "$overspentCount Limit Overdrawn" else "All targets healthy",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isBreached) Color(0xFFEF4444) else BentoAccentGreen
-                                    )
-                                }
-                            }
-                        }
-                        
-                        if (budgets.isEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Set limit cap",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Icon(
-                                    Icons.Default.ArrowForward,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Right Bento Card: Primary Bank Account & Balance Representation
-                val primaryAccount = accounts.maxByOrNull { it.balance }
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(180.dp)
-                        .clickable { onNavigateToTab(3) },
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (primaryAccount != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        if (primaryAccount == null) {
-                            Column {
-                                Text(
-                                    text = "ACCOUNTS",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "No registries setup.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Add account",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Icon(
-                                    Icons.Default.ArrowForward,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        } else {
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "VIP ACCOUNT",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
-                                        letterSpacing = 1.sp
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.CreditCard,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                
-                                Text(
-                                    text = primaryAccount.name.uppercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "₹${String.format(Locale.getDefault(), "%,.0f", primaryAccount.balance)}",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            
-                            val otherAccountsCount = accounts.size - 1
-                            Text(
-                                text = if (otherAccountsCount > 0) "+$otherAccountsCount other records" else "Primary deposit active",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = "Quick Log",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Tap to auto-fill",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
-
-
-
-        // 6. QuickLog Suggestions (replaces static shortcuts)
         if (quickLogSuggestions.isNotEmpty()) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Quick Log",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Tap to auto-fill",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -589,9 +329,34 @@ fun DashboardScreen(
                     }
                 }
             }
+        } else {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "⚡ Log a few transactions to unlock one-tap Quick Log shortcuts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
 
-        // 7. Recent Transactions Bento Card Block
+        // 5. Recent Transactions Bento Card Block
         item {
             Card(
                 modifier = Modifier
@@ -762,7 +527,7 @@ fun QuickLogCard(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = suggestion.note,
+                    text = suggestion.note.ifEmpty { suggestion.category },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,

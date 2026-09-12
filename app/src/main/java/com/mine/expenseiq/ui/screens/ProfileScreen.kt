@@ -1,10 +1,8 @@
 package com.mine.expenseiq.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mine.expenseiq.data.model.Category
+import com.mine.expenseiq.utils.BackupFileUtil
 import com.mine.expenseiq.viewmodel.ExpenseViewModel
 import com.mine.expenseiq.ui.theme.*
 
@@ -45,21 +44,50 @@ fun ProfileScreen(
     val transactions by viewModel.transactions.collectAsState()
     
     // UI states
-    var showExportDialog by remember { mutableStateOf(false) }
+    var showExportOptionsDialog by remember { mutableStateOf(false) }
     var showConfirmImportDialog by remember { mutableStateOf(false) }
-    var importJsonText by remember { mutableStateOf("") }
-    var exportedJsonText by remember { mutableStateOf("") }
-    
+    var pendingImportJson by remember { mutableStateOf<String?>(null) }
+
     // Category management states
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
-    
+
     // Toast controller helper
     var toastMessage by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toastMessage) {
         toastMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             toastMessage = null
+        }
+    }
+
+    // Backup export/import file launchers
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(BackupFileUtil.BACKUP_MIME_TYPE)
+    ) { uri ->
+        if (uri != null) {
+            val json = viewModel.exportDataAsJson()
+            if (json.isNotEmpty()) {
+                BackupFileUtil.writeJsonToUri(context, uri, json)
+            } else {
+                toastMessage = "Failed to generate backup data."
+            }
+        }
+    }
+
+    val openBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val json = BackupFileUtil.readJsonFromUri(context, uri)
+            when {
+                json == null -> toastMessage = "Could not read the selected backup file."
+                json.isBlank() -> toastMessage = "The selected backup file is empty."
+                else -> {
+                    pendingImportJson = json
+                    showConfirmImportDialog = true
+                }
+            }
         }
     }
 
@@ -384,11 +412,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(14.dp))
                     
                     Button(
-                        onClick = {
-                            val json = viewModel.exportDataAsJson()
-                            exportedJsonText = json
-                            showExportDialog = true
-                        },
+                        onClick = { showExportOptionsDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
@@ -396,7 +420,7 @@ fun ProfileScreen(
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Export Current Registry Backup", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
@@ -440,24 +464,19 @@ fun ProfileScreen(
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    OutlinedTextField(
-                        value = importJsonText,
-                        onValueChange = { importJsonText = it },
+                    Button(
+                        onClick = { openBackupLauncher.launch(arrayOf("application/json", "text/plain")) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp)
-                            .testTag("import_backup_input"),
-                        label = { Text("Paste Ledger Backup JSON") },
-                        placeholder = { Text("{\n  \"accounts\": [...],\n  \"transactions\": [...]\n}") },
+                            .height(52.dp)
+                            .testTag("import_backup_button"),
                         shape = RoundedCornerShape(16.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Select Backup File", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                     
                     Spacer(modifier = Modifier.height(10.dp))
                     
@@ -491,39 +510,12 @@ fun ProfileScreen(
                     
                     Spacer(modifier = Modifier.height(14.dp))
                     
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (importJsonText.isNotEmpty()) {
-                            OutlinedButton(
-                                onClick = { importJsonText = "" },
-                                modifier = Modifier.weight(1f).height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                            ) {
-                                Text("Clear Input", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
-                        
-                        Button(
-                            onClick = {
-                                if (importJsonText.trim().isEmpty()) {
-                                    toastMessage = "Please paste a ledger JSON string before validation triggers."
-                                } else {
-                                    showConfirmImportDialog = true
-                                }
-                            },
-                            modifier = Modifier.weight(2f).height(48.dp).testTag("import_validate_button"),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Validate & Load Fresh", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
+                    Text(
+                        text = "Choose a previously exported .json backup file. All current local data will be cleared and replaced by the file contents.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 14.sp
+                    )
                 }
             }
         }
@@ -531,68 +523,67 @@ fun ProfileScreen(
 
     // --- OVERLAY DIALOGS ---
 
-    // 1. EXPORTED BACKUP CLIPBOARD DIALOG
-    if (showExportDialog) {
+    // 1. EXPORT BACKUP OPTIONS DIALOG
+    if (showExportOptionsDialog) {
         AlertDialog(
-            onDismissRequest = { showExportDialog = false },
+            onDismissRequest = { showExportOptionsDialog = false },
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Ready-to-Copy Backup Ledger", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                    Text("Export Backup File", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "This code holds accounts, transactions, and categories in sync. Copy and store it safely in any text editor of your choice.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = exportedJsonText,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                }
+                Text(
+                    "Choose where to save the backup file. It holds all accounts, categories, budgets, and transactions.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        try {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Vault Ledger Backup", exportedJsonText)
-                            clipboard.setPrimaryClip(clip)
-                            toastMessage = "Backup JSON successfully copied to Clipboard!"
-                            showExportDialog = false
-                        } catch (e: Exception) {
-                            toastMessage = "Failed to copy: ${e.localizedMessage}"
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Copy Code block", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showExportDialog = false }
-                ) {
-                    Text("Close", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column {
+                    Button(
+                        onClick = {
+                            showExportOptionsDialog = false
+                            val json = viewModel.exportDataAsJson()
+                            if (json.isNotEmpty()) {
+                                BackupFileUtil.saveJsonToDownloads(context, json)
+                            } else {
+                                toastMessage = "Failed to generate backup data."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Save to Downloads", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            showExportOptionsDialog = false
+                            createBackupLauncher.launch(BackupFileUtil.suggestBackupFileName())
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Choose Location", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { showExportOptionsDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         )
@@ -705,17 +696,20 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val json = pendingImportJson
                         showConfirmImportDialog = false
-                        viewModel.importDataFromJson(
-                            jsonString = importJsonText,
-                            onSuccess = {
-                                toastMessage = "Import completed! Fresh ledger registers successfully setup."
-                                importJsonText = ""
-                            },
-                            onError = { err ->
-                                toastMessage = "Rebuild failure: $err"
-                            }
-                        )
+                        pendingImportJson = null
+                        if (json != null) {
+                            viewModel.importDataFromJson(
+                                jsonString = json,
+                                onSuccess = {
+                                    toastMessage = "Import completed! Fresh ledger registers successfully setup."
+                                },
+                                onError = { err ->
+                                    toastMessage = "Rebuild failure: $err"
+                                }
+                            )
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(12.dp)
@@ -725,7 +719,10 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showConfirmImportDialog = false }
+                    onClick = {
+                        showConfirmImportDialog = false
+                        pendingImportJson = null
+                    }
                 ) {
                     Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

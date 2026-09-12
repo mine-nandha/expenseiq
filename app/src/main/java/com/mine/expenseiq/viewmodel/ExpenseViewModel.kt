@@ -214,23 +214,48 @@ class ExpenseViewModel(
 
     fun computeQuickLogSuggestions() {
         val txs = transactions.value
+            .sortedWith(compareByDescending<ExpenseTransaction> { it.date }.thenByDescending { it.id })
+            .take(100)
         val groups = txs.filter { it.note !in listOf("Transaction", "SMS Sync") && it.tags != "Transfer" }
             .groupBy { it.note }
-            .mapValues { (_, txs) -> txs.sortedByDescending { it.date } }
+            .mapValues { (_, txList) -> txList.sortedByDescending { it.date } }
             .entries
             .sortedByDescending { it.value.size }
             .take(4)
-        _quickLogSuggestions.value = groups.map { (note, txs) ->
-            val latest = txs.first()
-            QuickLogSuggestion(
-                amount = latest.amount,
-                type = latest.type,
-                category = latest.category,
-                note = note,
-                accountId = latest.accountId,
-                accountName = latest.paymentMode,
-                frequency = txs.size
-            )
+        _quickLogSuggestions.value = if (groups.isNotEmpty()) {
+            groups.map { (note, txList) ->
+                val latest = txList.first()
+                QuickLogSuggestion(
+                    amount = latest.amount,
+                    type = latest.type,
+                    category = latest.category,
+                    note = note,
+                    accountId = latest.accountId,
+                    accountName = latest.paymentMode,
+                    frequency = txList.size
+                )
+            }
+        } else if (txs.isNotEmpty()) {
+            txs.filter { it.tags != "Transfer" }
+                .groupBy { it.category }
+                .mapValues { (_, txList) -> txList.sortedByDescending { it.date } }
+                .entries
+                .sortedByDescending { it.value.size }
+                .take(3)
+                .map { (category, txList) ->
+                    val latest = txList.first()
+                    QuickLogSuggestion(
+                        amount = latest.amount,
+                        type = latest.type,
+                        category = category,
+                        note = "",
+                        accountId = latest.accountId,
+                        accountName = latest.paymentMode,
+                        frequency = txList.size
+                    )
+                }
+        } else {
+            emptyList()
         }
     }
 

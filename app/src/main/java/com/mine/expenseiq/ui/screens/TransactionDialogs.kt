@@ -3,9 +3,11 @@ package com.mine.expenseiq.ui.screens
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,10 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,10 +33,13 @@ import com.mine.expenseiq.data.model.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddTransactionDialog(
     categories: List<Category>,
     accounts: List<Account>,
+    accountUsage: Map<Long, Int> = emptyMap(),
+    categoryUsage: Map<String, Map<String, Int>> = emptyMap(),
     prefill: QuickLogSuggestion? = null,
     onDismiss: () -> Unit,
     onSave: (
@@ -45,131 +54,431 @@ fun AddTransactionDialog(
         isRecurring: Boolean,
         recurrencePeriod: String?,
         tags: String
+    ) -> Unit,
+    onSaveAndAddAnother: (
+        amount: Double,
+        type: String,
+        category: String,
+        date: Long,
+        note: String,
+        paymentMode: String,
+        accountId: Long,
+        photoUri: String?,
+        isRecurring: Boolean,
+        recurrencePeriod: String?,
+        tags: String
     ) -> Unit
 ) {
+    fun mostUsedAccountId(): Long? =
+        accountUsage.entries
+            .filter { (id, _) -> accounts.any { it.id == id } }
+            .sortedByDescending { it.value }
+            .firstOrNull()?.key
+
+    fun mostUsedCategoryOf(type: String): String? =
+        categoryUsage[type]
+            ?.entries
+            ?.filter { (name, _) -> categories.any { it.type == type && it.name == name } }
+            ?.sortedByDescending { it.value }
+            ?.firstOrNull()?.key
+
+    val defaultCategory = prefill?.category
+        ?: mostUsedCategoryOf("EXPENSE")
+        ?: categories.firstOrNull { it.type == "EXPENSE" }?.name
+        ?: "Food"
+    val defaultAccount = accounts.firstOrNull { it.id == (prefill?.accountId ?: mostUsedAccountId() ?: -1L) }
+        ?: accounts.firstOrNull()
+
     var amountStr by remember { mutableStateOf(prefill?.amount?.toString() ?: "") }
     var type by remember { mutableStateOf(prefill?.type ?: "EXPENSE") }
-    var selectedCategory by remember { mutableStateOf(prefill?.category ?: (categories.firstOrNull { it.type == "EXPENSE" }?.name ?: "Food")) }
+    var selectedCategory by remember { mutableStateOf(defaultCategory) }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
     var note by remember { mutableStateOf(prefill?.note ?: "") }
-    
-    val defaultAccount = accounts.firstOrNull { it.id == (prefill?.accountId ?: 0L) } ?: accounts.firstOrNull()
-    var selectedAccountId by remember { mutableStateOf(prefill?.accountId ?: defaultAccount?.id ?: 1L) }
-    var selectedAccountName by remember { mutableStateOf(prefill?.accountName ?: defaultAccount?.name ?: "Cash") }
+
+    var selectedAccountId by remember { mutableStateOf(defaultAccount?.id ?: -1L) }
+    var selectedAccountName by remember { mutableStateOf(defaultAccount?.name ?: "Cash") }
 
     var isRecurring by remember { mutableStateOf(false) }
     var recurrencePeriod by remember { mutableStateOf("MONTHLY") }
     var tagsStr by remember { mutableStateOf("") }
     var receiptAttached by remember { mutableStateOf(false) }
 
+    var showAdvanced by remember { mutableStateOf(false) }
+    var showAllAccounts by remember { mutableStateOf(false) }
+    var showAllCategories by remember { mutableStateOf(false) }
+    var amountError by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
     val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+    val amountFocusRequester = remember { FocusRequester() }
+    val noteFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-    Dialog(
+    LaunchedEffect(Unit) {
+        amountFocusRequester.requestFocus()
+    }
+
+    val filteredCategories = categories.filter { it.type == type }
+
+    // Top-3 most-used account ids (usage order) plus the currently selected one.
+    val accountOrder = accountUsage.entries
+        .filter { (id, _) -> accounts.any { it.id == id } }
+        .sortedByDescending { it.value }
+        .map { it.key }
+        .let { ranked ->
+            if (ranked.isEmpty()) accounts.map { it.id } else {
+                val list = ranked.toMutableList()
+                accounts.filter { it.id !in list }.forEach { list.add(it.id) }
+                list
+            }
+        }
+    val topAccountIds = (accountOrder.take(3)).toSet()
+    val visibleAccounts = if (showAllAccounts) accounts else accounts.filter { it.id in topAccountIds || it.id == selectedAccountId }
+
+    // Top-3 most-used category names for the current type, plus the selected one.
+    val categoryOrder = categoryUsage[type]?.entries
+        ?.filter { (name, _) -> categories.any { it.type == type && it.name == name } }
+        ?.sortedByDescending { it.value }
+        ?.map { it.key }
+        ?: emptyList()
+    val categoryOrderWithRest = if (categoryOrder.isEmpty()) {
+        filteredCategories.map { it.name }
+    } else {
+        val list = categoryOrder.toMutableList()
+        filteredCategories.filter { it.name !in list }.forEach { list.add(it.name) }
+        list
+    }
+    val topCategoryNames = categoryOrderWithRest.take(3).toSet()
+    val visibleCategories = if (showAllCategories) {
+        filteredCategories
+    } else {
+        filteredCategories.filter { it.name in topCategoryNames || it.name == selectedCategory }
+    }
+
+    fun updateType(newType: String) {
+        if (type != newType) {
+            type = newType
+            selectedCategory = mostUsedCategoryOf(newType)
+                ?: categories.firstOrNull { it.type == newType }?.name
+                ?: selectedCategory
+        }
+    }
+
+    fun persist(keepOpen: Boolean) {
+        val finalAmount = amountStr.toDoubleOrNull()
+        if (finalAmount == null || finalAmount <= 0) {
+            amountError = "Please enter a valid amount greater than zero."
+            return
+        }
+        amountError = null
+        val photoPath = if (receiptAttached) "content://com.mine.expenseiq/receipt_mock" else null
+        val recurrence = if (isRecurring) recurrencePeriod else null
+        val saveFn = if (keepOpen) onSaveAndAddAnother else onSave
+        saveFn(
+            finalAmount,
+            type,
+            selectedCategory,
+            date,
+            note.ifEmpty { "Transaction" },
+            selectedAccountName,
+            selectedAccountId,
+            photoPath,
+            isRecurring,
+            recurrence,
+            tagsStr
+        )
+        if (keepOpen) {
+            amountStr = ""
+            note = ""
+            tagsStr = ""
+            receiptAttached = false
+            isRecurring = false
+            amountFocusRequester.requestFocus()
+        }
+    }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        modifier = Modifier.testTag("add_transaction_dialog"),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
     ) {
-        Surface(
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .wrapContentHeight()
-                .testTag("add_transaction_dialog"),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
         ) {
-            Column(
+            Text(
+                text = if (prefill != null) "Repeat Transaction" else "Add Transaction",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Type Toggle (Expense or Income)
+            Row(
                 modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text(
-                    text = "Add Transaction",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                val activeColor = MaterialTheme.colorScheme.primaryContainer
+                val inactiveColor = Color.Transparent
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Type Toggle (Expense or Income)
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                        .weight(1f)
+                        .background(if (type == "EXPENSE") activeColor else inactiveColor, RoundedCornerShape(10.dp))
+                        .clickable { updateType("EXPENSE") }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val activeColor = MaterialTheme.colorScheme.primaryContainer
-                    val inactiveColor = Color.Transparent
-                    
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (type == "EXPENSE") activeColor else inactiveColor, RoundedCornerShape(10.dp))
-                            .clickable { 
-                                type = "EXPENSE"
-                                // reset group category
-                                selectedCategory = categories.firstOrNull { it.type == "EXPENSE" }?.name ?: "Food"
-                            }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Expense", 
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (type == "EXPENSE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (type == "INCOME") activeColor else inactiveColor, RoundedCornerShape(10.dp))
-                            .clickable { 
-                                type = "INCOME"
-                                selectedCategory = categories.firstOrNull { it.type == "INCOME" }?.name ?: "Salary"
-                            }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Income", 
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (type == "INCOME") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        "Expense",
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (type == "EXPENSE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (type == "INCOME") activeColor else inactiveColor, RoundedCornerShape(10.dp))
+                        .clickable { updateType("INCOME") }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Income",
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (type == "INCOME") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                // Amount
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Amount + Note on one line (1:4 / 3:4)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.Top
+            ) {
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("Amount (INR)") },
-                    leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = "Amount Icon") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    label = { Text("Amount (₹)") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(onNext = { noteFocusRequester.requestFocus() }),
+                    isError = amountError != null,
+                    supportingText = amountError?.let { err -> { Text(err) } },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("amount_input"),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("amount_input")
+                        .focusRequester(amountFocusRequester),
                     shape = RoundedCornerShape(12.dp)
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Note
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Note / Merchant (e.g. Swiggy, PizzaHut)") },
-                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Note Icon") },
+                    label = { Text("Note / Merchant") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("note_input"),
+                    modifier = Modifier
+                        .weight(3f)
+                        .testTag("note_input")
+                        .focusRequester(noteFocusRequester),
                     shape = RoundedCornerShape(12.dp)
                 )
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
+            // Payment chips (single scrollable line)
+            Text(
+                text = "Payment",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                visibleAccounts.forEach { acc ->
+                    val selected = acc.id == selectedAccountId
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            selectedAccountId = acc.id
+                            selectedAccountName = acc.name
+                        },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                ColorDot(colorHex = acc.color)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    acc.name,
+                                    maxLines = 1
+                                )
+                            }
+                        },
+                        modifier = Modifier.testTag("account_chip_${acc.name}"),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            }
+            if (!showAllAccounts && accounts.size > visibleAccounts.size) {
+                TextButton(
+                    onClick = { showAllAccounts = true },
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text("Show all accounts (${accounts.size - visibleAccounts.size} more)")
+                }
+            } else if (showAllAccounts && accounts.size > topAccountIds.size) {
+                TextButton(
+                    onClick = { showAllAccounts = false },
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text("Show less")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Category chips (single scrollable line)
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                visibleCategories.forEach { cat ->
+                    val selected = cat.name == selectedCategory
+                    FilterChip(
+                        selected = selected,
+                        onClick = { selectedCategory = cat.name },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                ColorDot(colorHex = cat.color)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(cat.name, maxLines = 1)
+                            }
+                        },
+                        modifier = Modifier.testTag("category_chip_${cat.name}"),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            }
+            if (!showAllCategories && filteredCategories.size > visibleCategories.size) {
+                TextButton(
+                    onClick = { showAllCategories = true },
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text("Show all categories (${filteredCategories.size - visibleCategories.size} more)")
+                }
+            } else if (showAllCategories && filteredCategories.size > topCategoryNames.size) {
+                TextButton(
+                    onClick = { showAllCategories = false },
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text("Show less")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { persist(keepOpen = true) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Save & Add Another", fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = { persist(keepOpen = false) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .testTag("submit_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Advanced section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showAdvanced = !showAdvanced }
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "Toggle advanced options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Advanced (date, tags, recurring, receipt)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (showAdvanced) {
                 // Date Picker Trigger
                 OutlinedTextField(
                     value = sdf.format(Date(date)),
@@ -194,7 +503,7 @@ fun AddTransactionDialog(
                                 cal.get(Calendar.DAY_OF_MONTH)
                             ).show()
                         },
-                    enabled = false, // keeps keyboard disabled and triggers ripple
+                    enabled = false,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
@@ -203,92 +512,6 @@ fun AddTransactionDialog(
                         disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Accounts Dropdown Selection
-                var accountExpanded by remember { mutableStateOf(false) }
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedAccountName,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Payment Account") },
-                        leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Account Icon") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open accounts list") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { accountExpanded = true },
-                        enabled = false,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                    DropdownMenu(
-                        expanded = accountExpanded,
-                        onDismissRequest = { accountExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.85f)
-                    ) {
-                        accounts.forEach { acc ->
-                            DropdownMenuItem(
-                                text = { Text("${acc.name} (Bal: ₹${acc.balance})") },
-                                onClick = {
-                                    selectedAccountId = acc.id
-                                    selectedAccountName = acc.name
-                                    accountExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Categories dropdown
-                var categoryExpanded by remember { mutableStateOf(false) }
-                val filteredCategories = categories.filter { it.type == type }
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedCategory,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        leadingIcon = { Icon(Icons.Default.Category, contentDescription = "Category Icon") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open categories list") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { categoryExpanded = true },
-                        enabled = false,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                    DropdownMenu(
-                        expanded = categoryExpanded,
-                        onDismissRequest = { categoryExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.85f)
-                    ) {
-                        filteredCategories.forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text(cat.name) },
-                                onClick = {
-                                    selectedCategory = cat.name
-                                    categoryExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -385,46 +608,29 @@ fun AddTransactionDialog(
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val finalAmount = amountStr.toDoubleOrNull() ?: 0.0
-                            if (finalAmount > 0) {
-                                val photoPath = if (receiptAttached) "content://com.mine.expenseiq/receipt_mock" else null
-                                onSave(
-                                    finalAmount,
-                                    type,
-                                    selectedCategory,
-                                    date,
-                                    note.ifEmpty { "Transaction" },
-                                    selectedAccountName,
-                                    selectedAccountId,
-                                    photoPath,
-                                    isRecurring,
-                                    if (isRecurring) recurrencePeriod else null,
-                                    tagsStr
-                                )
-                            }
-                        },
-                        modifier = Modifier.testTag("submit_button")
-                    ) {
-                        Text("Save File")
-                    }
-                }
             }
         }
     }
+}
+
+private fun formatAmount(value: Double): String {
+    return if (value == value.toLong().toDouble()) {
+        value.toLong().toString()
+    } else {
+        value.toString()
+    }
+}
+
+@Composable
+private fun ColorDot(colorHex: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(8.dp)
+            .background(
+                runCatching { Color(android.graphics.Color.parseColor(colorHex)) }.getOrDefault(MaterialTheme.colorScheme.primary),
+                RoundedCornerShape(4.dp)
+            )
+    )
 }
 
 @Composable
