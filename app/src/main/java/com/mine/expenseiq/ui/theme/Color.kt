@@ -20,6 +20,14 @@ val BentoAccentBlue = Color(0xFF3B82F6)    // blue-500
 val BentoAccentPurple = Color(0xFF8B5CF6)  // purple-500
 val BentoAccentAmber = Color(0xFFFACC15)   // amber-400
 
+// Income accent — a deliberate green identity for money coming in
+val IncomeGreen = Color(0xFF059669)          // emerald-600
+val IncomeGreenDeep = Color(0xFF047857)      // emerald-700
+val IncomeContainerLight = Color(0xFFD1FAE5) // emerald-100
+val IncomeOnContainerLight = Color(0xFF064E3B) // emerald-900
+val IncomeContainerDark = Color(0xFF065F46)  // emerald-800
+val IncomeOnContainerDark = Color(0xFFA7F3D0) // emerald-200
+
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80 = Color(0xFFEFB8C8)

@@ -17,8 +17,8 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ID="com.mine.expenseiq"
-ACTIVITY="com.mine.expenseiq/.MainActivity"
+APP_ID="com.mine.expenseiq.debug"
+ACTIVITY="$APP_ID/com.mine.expenseiq.MainActivity"
 APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
 DEBOUNCE_MS=1200

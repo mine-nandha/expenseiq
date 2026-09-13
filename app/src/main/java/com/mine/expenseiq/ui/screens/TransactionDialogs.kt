@@ -1,9 +1,13 @@
 package com.mine.expenseiq.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -30,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.mine.expenseiq.data.model.*
+import com.mine.expenseiq.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -197,6 +203,17 @@ fun AddTransactionDialog(
         }
     }
 
+    val isIncome = type == "INCOME"
+    val isDark = isSystemInDarkTheme()
+    val slipAccent by animateColorAsState(
+        targetValue = if (isIncome) IncomeGreen else MaterialTheme.colorScheme.primary,
+        animationSpec = tween(220),
+        label = "slipAccent"
+    )
+    val accentContainer =
+        if (isIncome) (if (isDark) IncomeContainerDark else IncomeContainerLight)
+        else MaterialTheme.colorScheme.primaryContainer
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -215,110 +232,137 @@ fun AddTransactionDialog(
                 .padding(bottom = 24.dp)
         ) {
             Text(
-                text = if (prefill != null) "Repeat Transaction" else "Add Transaction",
+                text = if (prefill != null) "Repeat transaction" else "Log transaction",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Type Toggle (Expense or Income)
+            // Hero amount — the stamped total
+            OutlinedTextField(
+                value = amountStr,
+                onValueChange = {
+                    amountStr = it
+                    if (amountError != null) amountError = null
+                },
+                textStyle = AmountDisplay.copy(color = MaterialTheme.colorScheme.onSurface),
+                prefix = {
+                    Text("\u20B9", style = AmountDisplay.copy(color = slipAccent))
+                },
+                placeholder = {
+                    Text(
+                        "0.00",
+                        style = AmountDisplay.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        )
+                    )
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { noteFocusRequester.requestFocus() }),
+                isError = amountError != null,
+                supportingText = if (amountError != null) {
+                    { Text(amountError ?: "", color = MaterialTheme.colorScheme.error) }
+                } else null,
+                shape = RoundedCornerShape(4.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    errorBorderColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = slipAccent,
+                    focusedPrefixColor = slipAccent,
+                    unfocusedPrefixColor = slipAccent,
+                    errorTextColor = MaterialTheme.colorScheme.error,
+                    errorSupportingTextColor = MaterialTheme.colorScheme.error,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("amount_input")
+                    .focusRequester(amountFocusRequester)
+            )
+
+            // The stamp rule — the line the total is struck on
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .height(3.dp)
+                    .background(
+                        if (amountError != null) MaterialTheme.colorScheme.error else slipAccent,
+                        RoundedCornerShape(2.dp)
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Stamp toggle: Expense or Income
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
                     .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val activeColor = MaterialTheme.colorScheme.primaryContainer
-                val inactiveColor = Color.Transparent
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(if (type == "EXPENSE") activeColor else inactiveColor, RoundedCornerShape(10.dp))
-                        .clickable { updateType("EXPENSE") }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Expense",
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (type == "EXPENSE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(if (type == "INCOME") activeColor else inactiveColor, RoundedCornerShape(10.dp))
-                        .clickable { updateType("INCOME") }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Income",
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (type == "INCOME") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                SlipToggle(
+                    label = "Expense",
+                    selected = type == "EXPENSE",
+                    selectedColor = MaterialTheme.colorScheme.primary,
+                    onSelect = { updateType("EXPENSE") }
+                )
+                SlipToggle(
+                    label = "Income",
+                    selected = type == "INCOME",
+                    selectedColor = IncomeGreen,
+                    onSelect = { updateType("INCOME") }
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Amount + Note on one line (1:4 / 3:4)
+            // Note / merchant
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Note / merchant") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = hairlineFieldColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("note_input")
+                    .focusRequester(noteFocusRequester)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Paid from
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = amountStr,
-                    onValueChange = { amountStr = it },
-                    label = { Text("Amount (₹)") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(onNext = { noteFocusRequester.requestFocus() }),
-                    isError = amountError != null,
-                    supportingText = amountError?.let { err -> { Text(err) } },
-                    singleLine = true,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("amount_input")
-                        .focusRequester(amountFocusRequester),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text("Note / Merchant") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
-                    singleLine = true,
-                    modifier = Modifier
-                        .weight(3f)
-                        .testTag("note_input")
-                        .focusRequester(noteFocusRequester),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                SectionLabel("Paid from")
+                Spacer(modifier = Modifier.weight(1f))
+                if (accounts.size > visibleAccounts.size) {
+                    if (showAllAccounts) {
+                        TextButton(onClick = { showAllAccounts = false }) { Text("Less") }
+                    } else {
+                        TextButton(onClick = { showAllAccounts = true }) { Text("All ${accounts.size} accounts") }
+                    }
+                }
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Payment chips (single scrollable line)
-            Text(
-                text = "Payment",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -327,54 +371,38 @@ fun AddTransactionDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 visibleAccounts.forEach { acc ->
-                    val selected = acc.id == selectedAccountId
-                    FilterChip(
-                        selected = selected,
+                    SlipChip(
+                        selected = acc.id == selectedAccountId,
+                        dotColor = runCatching { Color(android.graphics.Color.parseColor(acc.color)) }
+                            .getOrDefault(MaterialTheme.colorScheme.primary),
+                        label = acc.name,
+                        modifier = Modifier.testTag("account_chip_${acc.name}"),
                         onClick = {
                             selectedAccountId = acc.id
                             selectedAccountName = acc.name
-                        },
-                        label = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                ColorDot(colorHex = acc.color)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    acc.name,
-                                    maxLines = 1
-                                )
-                            }
-                        },
-                        modifier = Modifier.testTag("account_chip_${acc.name}"),
-                        shape = RoundedCornerShape(10.dp)
+                        }
                     )
                 }
             }
-            if (!showAllAccounts && accounts.size > visibleAccounts.size) {
-                TextButton(
-                    onClick = { showAllAccounts = true },
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text("Show all accounts (${accounts.size - visibleAccounts.size} more)")
-                }
-            } else if (showAllAccounts && accounts.size > topAccountIds.size) {
-                TextButton(
-                    onClick = { showAllAccounts = false },
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text("Show less")
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Category
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionLabel("Category")
+                Spacer(modifier = Modifier.weight(1f))
+                if (filteredCategories.size > visibleCategories.size) {
+                    if (showAllCategories) {
+                        TextButton(onClick = { showAllCategories = false }) { Text("Less") }
+                    } else {
+                        TextButton(onClick = { showAllCategories = true }) { Text("All ${filteredCategories.size} categories") }
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Category chips (single scrollable line)
-            Text(
-                text = "Category",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -383,76 +411,46 @@ fun AddTransactionDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 visibleCategories.forEach { cat ->
-                    val selected = cat.name == selectedCategory
-                    FilterChip(
-                        selected = selected,
-                        onClick = { selectedCategory = cat.name },
-                        label = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                ColorDot(colorHex = cat.color)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(cat.name, maxLines = 1)
-                            }
-                        },
+                    SlipChip(
+                        selected = cat.name == selectedCategory,
+                        dotColor = runCatching { Color(android.graphics.Color.parseColor(cat.color)) }
+                            .getOrDefault(MaterialTheme.colorScheme.primary),
+                        label = cat.name,
                         modifier = Modifier.testTag("category_chip_${cat.name}"),
-                        shape = RoundedCornerShape(10.dp)
+                        onClick = { selectedCategory = cat.name }
                     )
                 }
             }
-            if (!showAllCategories && filteredCategories.size > visibleCategories.size) {
-                TextButton(
-                    onClick = { showAllCategories = true },
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text("Show all categories (${filteredCategories.size - visibleCategories.size} more)")
-                }
-            } else if (showAllCategories && filteredCategories.size > topCategoryNames.size) {
-                TextButton(
-                    onClick = { showAllCategories = false },
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text("Show less")
-                }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // Action buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Actions
+            Button(
+                onClick = { persist(keepOpen = false) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .testTag("submit_button"),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = slipAccent,
+                    contentColor = Color.White
+                )
             ) {
-                OutlinedButton(
-                    onClick = { persist(keepOpen = true) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Save & Add Another", fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = { persist(keepOpen = false) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .testTag("submit_button"),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Save", fontWeight = FontWeight.Bold)
-                }
+                Text("Save transaction", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.End),
-                shape = RoundedCornerShape(12.dp)
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { persist(keepOpen = true) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Save and add another", fontWeight = FontWeight.SemiBold)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // Advanced section
@@ -460,21 +458,20 @@ fun AddTransactionDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showAdvanced = !showAdvanced }
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Toggle advanced options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Advanced (date, tags, recurring, receipt)",
+                    text = "More options",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -485,7 +482,7 @@ fun AddTransactionDialog(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Date") },
-                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = "Date Icon") },
+                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = "Change date") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -507,7 +504,7 @@ fun AddTransactionDialog(
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
                         disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -520,7 +517,7 @@ fun AddTransactionDialog(
                     value = tagsStr,
                     onValueChange = { tagsStr = it },
                     label = { Text("Tags (comma separated, e.g. office, trip)") },
-                    leadingIcon = { Icon(Icons.Default.Label, contentDescription = "Tags Icon") },
+                    leadingIcon = { Icon(Icons.Default.Label, contentDescription = "Tags") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -528,11 +525,11 @@ fun AddTransactionDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Receipt/Bill attachment switcher
+                // Receipt/Bill attachment toggle
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (receiptAttached) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = if (receiptAttached) accentContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -545,18 +542,19 @@ fun AddTransactionDialog(
                     ) {
                         Icon(
                             imageVector = if (receiptAttached) Icons.Default.Receipt else Icons.Default.CameraAlt,
-                            contentDescription = "Receipt Attachment Icon",
-                            tint = if (receiptAttached) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            contentDescription = "Receipt attachment",
+                            tint = if (receiptAttached) slipAccent else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Attach Bill/Receipt Scan",
+                                "Attach bill / receipt",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                if (receiptAttached) "✓ Receipt attached: receipt_scan_mock.webp" else "Select receipt image from local gallery",
+                                if (receiptAttached) "\u2713 Receipt attached: receipt_scan_mock.webp"
+                                else "Select a receipt image from your gallery",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -566,26 +564,39 @@ fun AddTransactionDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Recurring Checkbox
+                // Recurring
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Recurring",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isRecurring) "Repeats every ${recurrencePeriod.lowercase(Locale.getDefault())}"
+                            else "Repeats on a schedule",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
                         checked = isRecurring,
                         onCheckedChange = { isRecurring = it }
                     )
-                    Text("Is Recurring Expense", style = MaterialTheme.typography.bodyMedium)
                 }
 
                 if (isRecurring) {
                     var recurrenceExpanded by remember { mutableStateOf(false) }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = recurrencePeriod,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Recurrence Frequency") },
+                            label = { Text("Recurrence frequency") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { recurrenceExpanded = true },
@@ -609,9 +620,100 @@ fun AddTransactionDialog(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun RowScope.SlipToggle(
+    label: String,
+    selected: Boolean,
+    selectedColor: Color,
+    onSelect: () -> Unit
+) {
+    val fill by animateColorAsState(
+        targetValue = if (selected) selectedColor else Color.Transparent,
+        animationSpec = tween(220),
+        label = "slipToggleFill"
+    )
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(fill)
+            .clickable(onClick = onSelect)
+            .padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SlipChip(
+    selected: Boolean,
+    dotColor: Color,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) dotColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) dotColor else MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(dotColor, RoundedCornerShape(4.dp))
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun hairlineFieldColors(): TextFieldColors =
+    OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        focusedBorderColor = MaterialTheme.colorScheme.outline
+    )
 
 private fun formatAmount(value: Double): String {
     return if (value == value.toLong().toDouble()) {
@@ -619,18 +721,6 @@ private fun formatAmount(value: Double): String {
     } else {
         value.toString()
     }
-}
-
-@Composable
-private fun ColorDot(colorHex: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(8.dp)
-            .background(
-                runCatching { Color(android.graphics.Color.parseColor(colorHex)) }.getOrDefault(MaterialTheme.colorScheme.primary),
-                RoundedCornerShape(4.dp)
-            )
-    )
 }
 
 @Composable
