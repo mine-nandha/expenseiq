@@ -293,6 +293,8 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
                 transaction = tx,
                 categories = categories,
                 accounts = accounts,
+                accountUsage = accountUsage,
+                categoryUsage = categoryUsage,
                 onDismiss = { activeEditTx = null },
                 onSave = { updatedTx ->
                     viewModel.updateTransaction(updatedTx)
