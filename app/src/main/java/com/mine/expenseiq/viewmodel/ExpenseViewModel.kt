@@ -34,6 +34,9 @@ class ExpenseViewModel(
     private val _quickLogSuggestions = MutableStateFlow<List<QuickLogSuggestion>>(emptyList())
     val quickLogSuggestions: StateFlow<List<QuickLogSuggestion>> = _quickLogSuggestions.asStateFlow()
 
+    // Session-scoped guard so the Home slip's stamp-in plays once per app launch, not per tab return.
+    var stampPlayed = false
+
     // --- SMS REALTIME FLOWS ---
     private val _pendingSms = MutableStateFlow<ParsedSms?>(null)
     val pendingSms: StateFlow<ParsedSms?> = _pendingSms.asStateFlow()

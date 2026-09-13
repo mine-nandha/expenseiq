@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.mine.expenseiq.R
 
@@ -44,31 +45,36 @@ val AmountDisplay = TextStyle(
   letterSpacing = (-1).sp,
 )
 
-// Set of Material typography styles to start with
+// One family product-wide: Space Grotesk carries both the ledger numerals and the UI text.
+private fun sg(
+  size: TextUnit,
+  lineHeight: TextUnit,
+  weight: FontWeight,
+  letterSpacing: TextUnit = 0.sp,
+) =
+  TextStyle(
+    fontFamily = SpaceGrotesk,
+    fontWeight = weight,
+    fontSize = size,
+    lineHeight = lineHeight,
+    letterSpacing = letterSpacing,
+  )
+
 val Typography =
   Typography(
-    bodyLarge =
-      TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp,
-      )
-    /* Other default text styles to override
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
-    )
-    */
+    displayLarge = sg(57.sp, 64.sp, FontWeight.Normal),
+    displayMedium = sg(45.sp, 52.sp, FontWeight.Normal),
+    displaySmall = sg(36.sp, 44.sp, FontWeight.Normal),
+    headlineLarge = sg(32.sp, 40.sp, FontWeight.Normal),
+    headlineMedium = sg(28.sp, 36.sp, FontWeight.Normal),
+    headlineSmall = sg(24.sp, 32.sp, FontWeight.Normal),
+    titleLarge = sg(22.sp, 28.sp, FontWeight.Normal),
+    titleMedium = sg(16.sp, 24.sp, FontWeight.Medium, 0.15.sp),
+    titleSmall = sg(14.sp, 20.sp, FontWeight.Medium, 0.1.sp),
+    bodyLarge = sg(16.sp, 24.sp, FontWeight.Normal, 0.5.sp),
+    bodyMedium = sg(14.sp, 20.sp, FontWeight.Normal, 0.25.sp),
+    bodySmall = sg(12.sp, 16.sp, FontWeight.Normal, 0.4.sp),
+    labelLarge = sg(14.sp, 20.sp, FontWeight.Medium, 0.1.sp),
+    labelMedium = sg(12.sp, 16.sp, FontWeight.Medium, 0.5.sp),
+    labelSmall = sg(11.sp, 16.sp, FontWeight.Medium, 0.5.sp),
   )

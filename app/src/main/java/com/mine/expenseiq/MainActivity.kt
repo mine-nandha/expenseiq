@@ -121,7 +121,7 @@ fun MainAppLayout(viewModel: ExpenseViewModel) {
             selected = currentTab == 0,
             onClick = { currentTab = 0 },
             icon = { Icon(if (currentTab == 0) Icons.Filled.Home else Icons.Outlined.Home, "Home") },
-            label = { Text("Dashboard") },
+            label = { Text("Home") },
             alwaysShowLabel = false,
             modifier = Modifier.testTag("tab_dashboard")
         )
