@@ -717,8 +717,6 @@ fun TransactionListItem(
 ) {
     val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
     val categoryDetails = categories.firstOrNull { it.name == transaction.category }
-    val themeColorHex = categoryDetails?.color ?: "#757575"
-    val themeColor = Color(android.graphics.Color.parseColor(themeColorHex))
 
     var expandedMenu by remember { mutableStateOf(false) }
 
@@ -727,13 +725,19 @@ fun TransactionListItem(
             .fillMaxWidth()
             .testTag("transaction_item_${transaction.id}")
             .clickable { expandedMenu = true }
-            .padding(vertical = 4.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val isTransfer = transaction.tags == "Transfer"
+        val isExpense = transaction.type == "EXPENSE"
 
-        // EMOJI / CATEGORY ICON
-        val emoji = if (isTransfer) "🔄"
+        // Ink token: the category's emoji inside a type-tinted ledger square.
+        val tokenBg = when {
+            isTransfer -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+            isExpense -> MaterialTheme.colorScheme.surfaceVariant
+            else -> if (isSystemInDarkTheme()) IncomeContainerDark else IncomeContainerLight
+        }
+        val tokenEmoji = if (isTransfer) "🔄"
             else categoryDetails?.iconName?.ifBlank { null }
             ?: when (transaction.category.lowercase().trim()) {
                 "food", "food & dining", "dining", "cafe", "restaurant", "starcafe" -> "☕"
@@ -747,21 +751,17 @@ fun TransactionListItem(
 
         Box(
             modifier = Modifier
-                .size(42.dp)
-                .background(
-                    if (isTransfer) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(14.dp)
-                ),
+                .size(36.dp)
+                .background(tokenBg, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = emoji,
-                fontSize = 18.sp
+                text = tokenEmoji,
+                fontSize = 17.sp
             )
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
